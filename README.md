@@ -1,13 +1,51 @@
-# React + Vite
+# 🛤️ Profit Pilgrim
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A procedurally-themed, infinite idle-clicker for the web.
+Profit Pilgrim is a simple but addictive incremental game where you click to earn profit, unlock upgrades, and watch as your business empire grows!
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Tap to earn profit**: Simple but satisfying click mechanic
+- **Idle earnings**: Continue to earn profit even when you're not playing
+- **Upgrades system**: Invest your profits to increase your earnings
+- **Stage progression**: Unlock new themes and stages as you earn more profit
+- **Persistent progress**: Your game progress is automatically saved
 
-## Expanding the ESLint configuration
+## How to Play
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-# Profit-Pilgrim
+1. Click on the main area to earn profit
+2. Use your profits to purchase upgrades
+3. Watch your business grow through different stages
+4. Unlock special power-ups as you progress
+
+## Development
+
+Profit Pilgrim is built with:
+- React 18 + Vite
+- Modern JavaScript (ES2023)
+- Zustand for state management
+- CSS variables for theming
+
+### Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+
+# Build for production
+npm run build
+```
+
+## Future Plans
+
+- Add more upgrades and stages
+- Implement special power-ups
+- Add achievements system
+- Add sound effects and more animations
+
+---
+
+Enjoy your journey to prosperity with Profit Pilgrim! 🚀
