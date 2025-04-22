@@ -3,7 +3,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import businessReducer, {
     purchaseBusiness,
     collectProfit,
-    updateBusinesses
+    updateBusinesses,
+    hireManager
 } from '../slices/businessSlice';
 
 describe('businessSlice', () => {
@@ -27,6 +28,9 @@ describe('businessSlice', () => {
                             level: 0,
                             productionTime: 1, // seconds
                             lastProduction: Date.now(),
+                            hasManager: false,
+                            managerCost: 100n,
+                            managerName: 'Farmer Joe'
                         }
                     },
                     currency: 1000000n // Start with enough currency to buy some businesses
@@ -38,6 +42,7 @@ describe('businessSlice', () => {
                         ignoredPaths: [
                             'business.businesses.farm.baseCost',
                             'business.businesses.farm.baseProfit',
+                            'business.businesses.farm.managerCost',
                             'business.currency'
                         ],
                     },
@@ -192,6 +197,120 @@ describe('businessSlice', () => {
 
             // Currency should not change
             expect(newState.currency).toBe(initialCurrency);
+        });
+    });
+
+    describe('hireManager', () => {
+        it('allows hiring a manager for an owned business', () => {
+            // First purchase the business
+            store.dispatch(purchaseBusiness('farm'));
+
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
+            const managerCost = initialState.businesses.farm.managerCost;
+
+            // Hire the manager
+            store.dispatch(hireManager('farm'));
+
+            const newState = store.getState().business;
+
+            // Check that manager was hired
+            expect(newState.businesses.farm.hasManager).toBe(true);
+
+            // Check that currency was deducted
+            expect(newState.currency).toBe(initialCurrency - managerCost);
+        });
+
+        it('prevents hiring a manager for a locked business', () => {
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
+
+            // Try to hire manager for a level 0 business
+            store.dispatch(hireManager('farm'));
+
+            const newState = store.getState().business;
+
+            // Manager should not be hired
+            expect(newState.businesses.farm.hasManager).toBe(false);
+
+            // Currency should not change
+            expect(newState.currency).toBe(initialCurrency);
+        });
+
+        it('prevents hiring if currency is insufficient', () => {
+            // First purchase the business
+            store.dispatch(purchaseBusiness('farm'));
+
+            // Set currency to less than manager cost
+            store.dispatch({
+                type: 'business/setCurrency',
+                payload: 10n // Less than 100n manager cost
+            });
+
+            const initialState = store.getState().business;
+
+            // Try to hire the manager
+            store.dispatch(hireManager('farm'));
+
+            const newState = store.getState().business;
+
+            // Manager should not be hired
+            expect(newState.businesses.farm.hasManager).toBe(false);
+        });
+
+        it('prevents hiring a manager that is already hired', () => {
+            // First purchase the business
+            store.dispatch(purchaseBusiness('farm'));
+
+            // Hire the manager
+            store.dispatch(hireManager('farm'));
+
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
+
+            // Try to hire again
+            store.dispatch(hireManager('farm'));
+
+            const newState = store.getState().business;
+
+            // Currency should not change
+            expect(newState.currency).toBe(initialCurrency);
+        });
+    });
+
+    describe('updateBusinesses with managers', () => {
+        it('automatically collects profits when manager is hired', () => {
+            // Purchase the business
+            store.dispatch(purchaseBusiness('farm'));
+
+            // Hire the manager
+            store.dispatch(hireManager('farm'));
+
+            // Set lastProduction to be in the past (beyond production time)
+            const now = Date.now();
+            const pastTime = now - 2000; // 2 seconds ago
+
+            // Manually update the lastProduction time
+            store.dispatch({
+                type: 'business/setBusinessLastProduction',
+                payload: { id: 'farm', time: pastTime }
+            });
+
+            // Record initial currency
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
+
+            // Update businesses - this should auto-collect due to manager
+            store.dispatch(updateBusinesses());
+
+            const newState = store.getState().business;
+
+            // Should have collected farm profit due to manager
+            const expectedProfit = initialState.businesses.farm.baseProfit;
+            expect(newState.currency).toBe(initialCurrency + expectedProfit);
+
+            // Should have updated lastProduction
+            expect(newState.businesses.farm.lastProduction).toBeGreaterThanOrEqual(now);
         });
     });
 }); 

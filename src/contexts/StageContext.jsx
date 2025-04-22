@@ -1,17 +1,18 @@
 import { createContext, useContext, useEffect } from 'react';
-import { useStore } from '../stores/store';
+import { useSelector, useDispatch } from 'react-redux';
+import { checkStageProgressThunk } from '../slices/stageSlice';
 
 const StageContext = createContext();
 
 export function StageProvider({ children }) {
-    const currentStage = useStore(state => state.currentStage);
-    const stages = useStore(state => state.stages);
-    const checkStageProgress = useStore(state => state.checkStageProgress);
-    const currency = useStore(state => state.currency);
+    const dispatch = useDispatch();
+    const currentStage = useSelector(state => state.stage.currentStage);
+    const stages = useSelector(state => state.stage.stages);
+    const currency = useSelector(state => state.business.currency);
 
     useEffect(() => {
-        checkStageProgress();
-    }, [currency, checkStageProgress]);
+        dispatch(checkStageProgressThunk());
+    }, [currency, dispatch]);
 
     const currentTheme = stages[currentStage].theme;
 

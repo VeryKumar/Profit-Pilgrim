@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { setCurrency } from './businessSlice';
 
 const initialState = {
     currency: 50n,
@@ -25,6 +26,7 @@ export const clickerSlice = createSlice({
         },
         addClick: (state) => {
             state.currency = state.currency + BigInt(state.clickValue);
+            // Business currency is updated in the thunk
         },
         tickIdle: (state, action) => {
             const now = action.payload;
@@ -33,13 +35,43 @@ export const clickerSlice = createSlice({
             if (delta > 0) {
                 state.currency = state.currency + BigInt(delta * state.idleRate);
                 state.lastTick = now;
+                // Business currency is updated in the thunk
             }
         }
     }
 });
 
+// Thunk to add click and update business currency
+export const addClickThunk = () => (dispatch, getState) => {
+    dispatch(addClick());
+
+    const state = getState();
+    const clickValue = state.clicker.clickValue;
+    const currentCurrency = state.business.currency;
+
+    // Update business currency with the click value
+    dispatch(setCurrency(currentCurrency + BigInt(clickValue)));
+};
+
+// Thunk to tick idle and update business currency
+export const tickIdleThunk = (now) => (dispatch, getState) => {
+    dispatch(tickIdle(now));
+
+    const state = getState();
+    const idleRate = state.clicker.idleRate;
+    const currentCurrency = state.business.currency;
+    const lastTick = state.clicker.lastTick;
+
+    const delta = Math.floor((now - lastTick) / 1000);
+
+    if (delta > 0) {
+        // Update business currency with the idle value
+        dispatch(setCurrency(currentCurrency + BigInt(delta * idleRate)));
+    }
+};
+
 export const {
-    setCurrency,
+    setCurrency: setClickerCurrency,
     setClickValue,
     setIdleRate,
     setLastTick,

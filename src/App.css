@@ -631,18 +631,42 @@ body {
 /* Business timers and progress */
 .progress-bar-container {
   width: 100%;
-  height: 6px;
+  height: 8px;
   background-color: rgba(0, 0, 0, 0.2);
-  border-radius: 3px;
+  border-radius: 4px;
   overflow: hidden;
-  margin-top: 5px;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  margin: 4px 0;
 }
 
 .progress-bar-fill {
   height: 100%;
   background-color: var(--color-accent);
-  border-radius: 3px;
-  transition: width 0.1s linear;
+  border-radius: 4px;
+  transition: width 0.3s ease-out;
+}
+
+.progress-bar-fill.ready {
+  background: linear-gradient(
+    45deg,
+    var(--color-accent) 25%,
+    var(--color-accent-light) 25%,
+    var(--color-accent-light) 50%,
+    var(--color-accent) 50%,
+    var(--color-accent) 75%,
+    var(--color-accent-light) 75%
+  );
+  background-size: 20px 20px;
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 20px 0;
+  }
 }
 
 .business-ready {
@@ -710,4 +734,143 @@ body {
   font-weight: bold;
   animation: float-up 0.8s ease-out forwards;
   z-index: 100;
+}
+
+/* Managers */
+.managers-modal {
+  width: 600px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.manager-intro {
+  margin-bottom: 20px;
+  color: var(--color-dark-text);
+  font-size: 1.1em;
+}
+
+.managers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.manager-item {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  padding: 15px;
+  transition: transform 0.2s;
+}
+
+.manager-item.locked {
+  opacity: 0.7;
+}
+
+.manager-item:hover {
+  transform: translateY(-2px);
+}
+
+.manager-icon {
+  font-size: 2em;
+  margin-right: 15px;
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+}
+
+.manager-info {
+  flex: 1;
+  text-align: left;
+}
+
+.manager-name {
+  font-weight: bold;
+  font-size: 1.2em;
+  color: var(--color-dark-text);
+}
+
+.manager-business {
+  font-size: 0.9em;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.manager-description {
+  font-size: 0.9em;
+  color: var(--color-dark-text);
+}
+
+.manager-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 15px;
+}
+
+.manager-cost {
+  font-weight: bold;
+  color: var(--color-dark-text);
+  margin-bottom: 5px;
+}
+
+.hire-button {
+  background-color: var(--color-accent);
+  color: var(--color-dark-text);
+  border: none;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s, background-color 0.2s;
+}
+
+.hire-button:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.hire-button:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.hire-button.disabled {
+  background-color: #ccc;
+  color: #666;
+  cursor: not-allowed;
+}
+
+.manager-hired {
+  background-color: var(--color-green-light);
+  color: white;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.manager-locked {
+  background-color: #aaa;
+  color: #444;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-weight: bold;
+}
+
+.manager-indicator {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  background-color: var(--color-green-light);
+  color: white;
+  font-size: 0.8em;
+  padding: 2px 6px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
 }

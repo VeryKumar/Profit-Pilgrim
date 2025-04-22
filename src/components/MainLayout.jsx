@@ -1,19 +1,36 @@
-import { useStore } from '../stores/store';
 import { formatCurrency } from '../utils/formatters';
 import { useStage } from '../contexts/StageContext';
 import { useEffect, useState } from 'react';
+import ManagersModal from './ManagersModal';
+import { useSelector, useDispatch } from 'react-redux';
+import {
+    toggleManagersModal,
+    togglePowerUpModal
+} from '../slices/uiSlice';
+import {
+    addClickThunk
+} from '../slices/clickerSlice';
+import {
+    purchaseBusiness,
+    upgradeBusinessLevel,
+    collectProfit
+} from '../slices/businessSlice';
 
 function MainLayout() {
-    const powerUpModalOpen = useStore(state => state.powerUpModalOpen);
-    const togglePowerUpModal = useStore(state => state.togglePowerUpModal);
-    const currency = useStore(state => state.currency);
-    const businesses = useStore(state => state.businesses || {});
-    const purchaseBusiness = useStore(state => state.purchaseBusiness);
-    const upgradeBusinessLevel = useStore(state => state.upgradeBusinessLevel);
-    const collectProfit = useStore(state => state.collectProfit);
-    const addClick = useStore(state => state.addClick);
-    const clickValue = useStore(state => state.clickValue);
-    const idleRate = useStore(state => state.idleRate);
+    const dispatch = useDispatch();
+
+    // UI State
+    const powerUpModalOpen = useSelector(state => state.ui.powerUpModalOpen);
+    const managersModalOpen = useSelector(state => state.ui.managersModalOpen);
+
+    // Clicker State
+    const clickValue = useSelector(state => state.clicker.clickValue);
+    const idleRate = useSelector(state => state.clicker.idleRate);
+
+    // Business State
+    const businesses = useSelector(state => state.business.businesses || {});
+    const currency = useSelector(state => state.business.currency);
+
     const [remainingTime, setRemainingTime] = useState('00:00:00');
     const [clickFeedback, setClickFeedback] = useState(null);
     const [businessTimers, setBusinessTimers] = useState({});
@@ -59,20 +76,24 @@ function MainLayout() {
                     return;
                 }
 
-                const timeSinceProduction = (now - business.lastProduction) / 1000;
-                const cycleTime = business.productionTime;
-                const progress = Math.min(timeSinceProduction / cycleTime, 1);
-                const timeLeft = Math.max(0, cycleTime - timeSinceProduction);
+                const timeSinceProduction = now - business.lastProduction;
+                const cycleDuration = business.productionTime * 1000; // Convert to ms
+
+                // Calculate progress as a percentage from 0 to 1
+                // Progress increases from 0 (just clicked) to 1 (ready to collect)
+                // If ready for collection, keep progress at 1 (100%)
+                const progress = business.readyForCollection ? 1 : Math.min(timeSinceProduction / cycleDuration, 1);
+                const timeLeft = business.readyForCollection ? 0 : Math.max(0, cycleDuration - timeSinceProduction) / 1000;
 
                 updatedTimers[business.id] = {
                     progress,
                     timeLeft: timeLeft.toFixed(1),
-                    ready: progress >= 1
+                    ready: progress >= 1 || business.readyForCollection
                 };
             });
 
             setBusinessTimers(updatedTimers);
-        }, 100);
+        }, 50); // More frequent updates for smoother animation
 
         return () => clearInterval(interval);
     }, [businesses]);
@@ -120,7 +141,7 @@ function MainLayout() {
 
     // Handle clicking with visual feedback
     const handleClick = (e) => {
-        addClick();
+        dispatch(addClickThunk());
 
         // Hide the click prompt once the user clicks
         setShowClickPrompt(false);
@@ -147,9 +168,13 @@ function MainLayout() {
 
         if (business.level === 0) return; // Cannot click on locked businesses
 
-        const wasCollected = collectProfit(business.id);
+        const timer = businessTimers[business.id];
+        const isReady = timer && timer.ready;
 
-        if (wasCollected) {
+        if (isReady) {
+            // Call collectProfit action and check if it was successful
+            dispatch(collectProfit(business.id));
+
             // Create visual feedback for profit collection
             const rect = e.currentTarget.getBoundingClientRect();
             const clickPos = {
@@ -175,6 +200,14 @@ function MainLayout() {
         }
     };
 
+    const handleToggleManagersModal = () => {
+        dispatch(toggleManagersModal());
+    };
+
+    const handleTogglePowerUpModal = () => {
+        dispatch(togglePowerUpModal());
+    };
+
     return (
         <div className="game-container">
             {/* Sidebar */}
@@ -198,8 +231,11 @@ function MainLayout() {
                 <div className="menu-item">
                     <span>Upgrades</span>
                 </div>
-                <div className="menu-item">
+                <div className="menu-item" onClick={handleToggleManagersModal}>
                     <span>Managers</span>
+                    {Object.values(businesses).some(b => b.level > 0 && !b.hasManager) && (
+                        <div className="menu-item-badge">!</div>
+                    )}
                 </div>
                 <div className="menu-item">
                     <span>Investors</span>
@@ -290,12 +326,14 @@ function MainLayout() {
                 {Object.values(businesses).map(business => {
                     const timer = businessTimers[business.id] || { progress: 0, timeLeft: business.productionTime, ready: false };
                     const isReady = timer.ready && business.level > 0;
+                    const hasManager = business.hasManager;
 
                     return (
                         <div className={`business-item ${isReady ? 'business-ready' : ''}`} key={business.id}>
                             <div className="business-header">
                                 <div className="business-amount">{formatCurrency(calculateProfit(business))}</div>
                                 <div>{business.level > 0 ? 'profit per click' : 'locked'}</div>
+                                {hasManager && <div className="manager-indicator">👨‍💼 Auto</div>}
                             </div>
                             <div className="business-content">
                                 <div
@@ -310,7 +348,7 @@ function MainLayout() {
                                     {business.level > 0 && (
                                         <div className="progress-bar-container">
                                             <div
-                                                className="progress-bar-fill"
+                                                className={`progress-bar-fill ${isReady ? 'ready' : ''}`}
                                                 style={{ width: `${timer.progress * 100}%` }}
                                             ></div>
                                         </div>
@@ -326,7 +364,7 @@ function MainLayout() {
                                         <div className="business-timer">00:00:00</div>
                                         <button
                                             className={`buy-button ${canAffordBusiness(business) ? '' : 'disabled'}`}
-                                            onClick={() => purchaseBusiness(business.id)}
+                                            onClick={() => dispatch(purchaseBusiness(business.id))}
                                             disabled={!canAffordBusiness(business)}
                                         >
                                             Buy x1
@@ -342,7 +380,7 @@ function MainLayout() {
                                         </div>
                                         <button
                                             className={`upgrade-button ${canAffordUpgrade(business) ? '' : 'disabled'}`}
-                                            onClick={() => upgradeBusinessLevel(business.id)}
+                                            onClick={() => dispatch(upgradeBusinessLevel(business.id))}
                                             disabled={!canAffordUpgrade(business)}
                                         >
                                             Upgrade
@@ -368,16 +406,23 @@ function MainLayout() {
 
             {/* Power Up Modal if open */}
             {powerUpModalOpen && (
-                <div className="power-up-modal" onClick={togglePowerUpModal}>
+                <div className="power-up-modal" onClick={handleTogglePowerUpModal}>
                     <div className="modal-content" onClick={e => e.stopPropagation()}>
                         <div className="modal-header">
                             <h2>Power Ups</h2>
-                            <button className="modal-close" onClick={togglePowerUpModal}>×</button>
+                            <button className="modal-close" onClick={handleTogglePowerUpModal}>×</button>
                         </div>
                         <div className="modal-body">
                             <p>Special power ups coming soon!</p>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Managers Modal if open */}
+            {managersModalOpen && (
+                <div className="power-up-modal" onClick={handleToggleManagersModal}>
+                    <ManagersModal onClose={handleToggleManagersModal} />
                 </div>
             )}
         </div>
