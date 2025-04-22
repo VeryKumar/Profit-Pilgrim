@@ -1,182 +1,131 @@
-import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { screen, fireEvent, act } from '@testing-library/react';
-import { renderWithProviders } from './utils';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { screen, fireEvent, cleanup, render } from '@testing-library/react';
+import { configureStore } from '@reduxjs/toolkit';
+import { Provider } from 'react-redux';
+import clickerReducer from '../slices/clickerSlice';
+import businessReducer from '../slices/businessSlice';
 import App from '../App';
-import { createMockStore } from './storeMock';
-import * as storeModule from '../stores/store';
+import * as StageContextModule from '../contexts/StageContext';
 
-// Mock the store module
+// Mock the StageContext
 vi.mock('../contexts/StageContext', () => ({
-    StageProvider: ({ children }) => <div data-testid="mock-stage-provider">{children}</div>,
-    useStage: () => ({
-        currentStage: 'beginning',
-        stageName: 'The Journey Begins',
-        stageDescription: 'Your first steps on the path to profit',
-        theme: {
-            primary: '#6366f1',
-            secondary: '#4f46e5',
-            background: '#f8fafc',
-            accent: '#ec4899',
-        }
-    })
+    StageProvider: ({ children }) => children,
+    useStage: vi.fn()
 }));
 
-vi.mock('../stores/store', () => {
-    const actual = vi.importActual('../stores/store');
-    return {
-        ...actual,
-        useStore: vi.fn()
-    };
-});
+// Mock timers for testing
+vi.useFakeTimers();
 
-describe('Gameplay Integration', () => {
-    let mockStore;
-    let advanceTimers;
+describe('Gameplay Integration Tests', () => {
+    let store;
+    const mockCheckStageProgress = vi.fn();
 
     beforeEach(() => {
-        // Setup mock timers
-        vi.useFakeTimers();
-        advanceTimers = (ms) => {
-            act(() => {
-                vi.advanceTimersByTime(ms);
-            });
-        };
-
-        // Create a mock store
-        mockStore = createMockStore({
-            currency: 10n, // Start with some currency
-            clickValue: 5, // Set the click value to match our implementation
-            idleRate: 1, // Set idle rate to match our implementation
+        // Create a clean store before each test
+        store = configureStore({
+            reducer: {
+                clicker: clickerReducer,
+                business: businessReducer
+            },
+            preloadedState: {
+                clicker: {
+                    currency: 10n,
+                    clickValue: 1n,
+                    idleRate: 0n
+                },
+                business: {
+                    businesses: {
+                        farm: {
+                            id: 'farm',
+                            name: 'Small Farm',
+                            description: 'A small but productive farm',
+                            icon: '🌱',
+                            baseCost: 10n,
+                            baseProfit: 1n,
+                            level: 0,
+                            productionTime: 1,
+                            lastProduction: Date.now()
+                        }
+                    }
+                }
+            }
         });
 
-        // Mock the store
-        storeModule.useStore.mockImplementation(selector => {
-            return selector(mockStore);
+        // Mock the StageContext
+        StageContextModule.useStage.mockReturnValue({
+            currentStage: 'beginning',
+            stageName: 'The Journey Begins',
+            stageDescription: 'Your first steps on the path to profit',
+            theme: {
+                primary: '#6366f1',
+                secondary: '#4f46e5',
+                background: '#f8fafc',
+                accent: '#ec4899',
+            },
+            checkStageProgress: mockCheckStageProgress
         });
     });
 
     afterEach(() => {
+        cleanup();
         vi.resetAllMocks();
-        vi.useRealTimers();
     });
 
-    it('should simulate a complete gameplay loop', async () => {
-        // 1. Render the app
-        renderWithProviders(<App />);
+    it('simulates a basic game session', () => {
+        // Render the app with the test store
+        render(
+            <Provider store={store}>
+                <App />
+            </Provider>
+        );
 
-        // 2. Verify initial state
-        expect(mockStore.currency).toBe(10n);
-        expect(mockStore.currentStage).toBe('beginning');
+        // Initial state: 10 currency
+        expect(store.getState().clicker.currency).toBe(10n);
+        expect(store.getState().business.businesses.farm.level).toBe(0);
 
-        // 3. Click to earn currency
-        act(() => {
-            // Simulate 10 clicks
-            for (let i = 0; i < 10; i++) {
-                mockStore.addClick();
-            }
-        });
+        // Click the button to earn currency
+        const clickButton = screen.getByText('Click for Profit!');
+        fireEvent.click(clickButton);
 
-        // 4. Verify currency increased
-        expect(mockStore.currency).toBe(60n); // 10 initial + (10 clicks * 5 per click)
+        // Should have 11 currency after clicking
+        expect(store.getState().clicker.currency).toBe(11n);
 
-        // 5. Advance time to earn idle income
-        // Idle rate is already set in beforeEach
-        const initialTime = Date.now();
+        // Purchase the farm
+        const buyButton = screen.getByText('Buy x1');
+        fireEvent.click(buyButton);
 
-        // Advance 5 seconds
-        advanceTimers(5000);
+        // Should have spent 10 currency, and have 1 remaining
+        expect(store.getState().clicker.currency).toBe(1n);
+        expect(store.getState().business.businesses.farm.level).toBe(1);
 
-        act(() => {
-            // Tick idle manually as we're not actually running the app's useEffect
-            mockStore.tickIdle(initialTime + 5000);
-        });
+        // Advance time to trigger business production
+        vi.advanceTimersByTime(1000);
 
-        // 6. Verify idle income
-        expect(mockStore.currency).toBe(65n); // 60 from clicks + 5 from idle
+        // Should have earned 1 currency from the business
+        expect(store.getState().clicker.currency).toBe(2n);
 
-        // 7. Purchase a business
-        act(() => {
-            mockStore.purchaseBusiness('farm');
-        });
+        // Click a few more times
+        fireEvent.click(clickButton);
+        fireEvent.click(clickButton);
 
-        // 8. Verify business purchase
-        expect(mockStore.businesses.farm.level).toBe(1);
-        expect(mockStore.currency).toBe(55n); // 65 - 10 cost
+        // Should now have 4 currency (2 + 2 clicks)
+        expect(store.getState().clicker.currency).toBe(4n);
 
-        // 9. Wait for business production
-        const farmProductionTime = mockStore.businesses.farm.productionTime * 1000;
-        advanceTimers(farmProductionTime + 100); // Add a bit extra to be safe
+        // Advance time again for more business production
+        vi.advanceTimersByTime(3000);
 
-        act(() => {
-            mockStore.updateBusinesses();
-        });
+        // Should have earned 3 more currency from business (1 per second)
+        expect(store.getState().clicker.currency).toBe(7n);
 
-        // 10. Verify business income (adjusted based on actual implementation)
-        expect(mockStore.currency).toBe(57n); // Previous value (55) + 2 from farm production (may vary depending on implementation)
+        // Verify stage progress was checked
+        expect(mockCheckStageProgress).toHaveBeenCalled();
 
-        // 11. Earn enough for stage progression
-        act(() => {
-            // Set currency to trigger stage progression
-            mockStore.currency = mockStore.stages.momentum.unlockAt;
+        // Test a longer production cycle
+        const startCurrency = store.getState().clicker.currency;
+        vi.advanceTimersByTime(10000);
+        const endCurrency = store.getState().clicker.currency;
 
-            // Manually set the stage instead of using checkStageProgress
-            mockStore.currentStage = 'momentum';
-        });
-
-        // 12. Verify stage progression
-        expect(mockStore.currentStage).toBe('momentum');
-
-        // 13. Purchase multiple business levels
-        act(() => {
-            // Set currency high enough for multiple levels
-            mockStore.currency = 1000n;
-
-            // Purchase several levels
-            mockStore.purchaseBusiness('farm');
-            mockStore.purchaseBusiness('farm');
-            mockStore.purchaseBusiness('cafe');
-        });
-
-        // 14. Verify multiple businesses
-        expect(mockStore.businesses.farm.level).toBe(3);
-        expect(mockStore.businesses.cafe.level).toBe(1);
-
-        // 15. Verify advanced game state
-        expect(mockStore.currency).toBeLessThan(1000n); // Should have spent some currency
-        expect(mockStore.businesses.farm.level).toBeGreaterThan(2); // Should have leveled up farm
-    });
-
-    it('should handle multiple business update cycles', () => {
-        // Setup businesses
-        mockStore.currency = 1000n;
-
-        act(() => {
-            mockStore.purchaseBusiness('farm');
-            mockStore.purchaseBusiness('cafe');
-        });
-
-        // Record currency after purchases
-        const currencyAfterPurchase = mockStore.currency;
-
-        // Advance time to complete multiple production cycles
-        const now = Date.now();
-
-        // Set last production to 10 seconds ago
-        mockStore.businesses.farm.lastProduction = now - 10000;
-        mockStore.businesses.cafe.lastProduction = now - 10000;
-
-        // Update businesses
-        act(() => {
-            mockStore.updateBusinesses();
-        });
-
-        // Verify currency after production cycles
-        // Note: The exact output may vary depending on implementation details
-        // We check that some currency was added rather than expecting an exact amount
-        expect(mockStore.currency).toBeGreaterThan(currencyAfterPurchase);
-
-        // Last production should be updated
-        expect(mockStore.businesses.farm.lastProduction).toBeGreaterThanOrEqual(now);
-        expect(mockStore.businesses.cafe.lastProduction).toBeGreaterThanOrEqual(now);
+        // Currency should increase after production cycles
+        expect(endCurrency).toBeGreaterThan(startCurrency);
     });
 }); 

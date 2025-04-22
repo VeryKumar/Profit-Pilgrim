@@ -9,12 +9,13 @@ function App() {
   const updateBusinesses = useStore(state => state.updateBusinesses)
 
   useEffect(() => {
-    // Setup idle ticker
+    // Setup idle ticker and business state updater
     const interval = setInterval(() => {
       const now = Date.now();
       tickIdle(now);
+      // Only update business UI states, doesn't auto-collect profits anymore
       updateBusinesses();
-    }, 1000);
+    }, 100); // More frequent updates for smoother UI
 
     return () => clearInterval(interval);
   }, [tickIdle, updateBusinesses]);

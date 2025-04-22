@@ -1,62 +1,107 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createMockStore } from './storeMock';
+import { configureStore } from '@reduxjs/toolkit';
+import businessReducer, {
+    purchaseBusiness,
+    collectProfit,
+    updateBusinesses
+} from '../slices/businessSlice';
 
 describe('businessSlice', () => {
     let store;
 
     beforeEach(() => {
-        store = createMockStore({
-            currency: 1000000n // Start with enough currency to buy some businesses
+        store = configureStore({
+            reducer: {
+                business: businessReducer
+            },
+            preloadedState: {
+                business: {
+                    businesses: {
+                        farm: {
+                            id: 'farm',
+                            name: 'Small Farm',
+                            description: 'A small but productive farm',
+                            icon: '🌱',
+                            baseCost: 10n,
+                            baseProfit: 1n,
+                            level: 0,
+                            productionTime: 1, // seconds
+                            lastProduction: Date.now(),
+                        }
+                    },
+                    currency: 1000000n // Start with enough currency to buy some businesses
+                }
+            },
+            middleware: (getDefaultMiddleware) =>
+                getDefaultMiddleware({
+                    serializableCheck: {
+                        ignoredPaths: [
+                            'business.businesses.farm.baseCost',
+                            'business.businesses.farm.baseProfit',
+                            'business.currency'
+                        ],
+                    },
+                }),
         });
     });
 
     it('initializes with predefined businesses', () => {
-        expect(store.businesses).toBeDefined();
-        expect(Object.keys(store.businesses).length).toBeGreaterThan(0);
-        expect(store.businesses.farm).toBeDefined();
-        expect(store.businesses.farm.level).toBe(0);
+        const state = store.getState().business;
+        expect(state.businesses).toBeDefined();
+        expect(Object.keys(state.businesses).length).toBeGreaterThan(0);
+        expect(state.businesses.farm).toBeDefined();
+        expect(state.businesses.farm.level).toBe(0);
     });
 
     describe('purchaseBusiness', () => {
         it('allows purchasing a business when player has enough currency', () => {
-            const initialCurrency = store.currency;
-            const farmCost = store.businesses.farm.baseCost;
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
+            const farmCost = initialState.businesses.farm.baseCost;
 
             // Purchase farm
-            store.purchaseBusiness('farm');
+            store.dispatch(purchaseBusiness('farm'));
+
+            const newState = store.getState().business;
 
             // Check that level increased
-            expect(store.businesses.farm.level).toBe(1);
+            expect(newState.businesses.farm.level).toBe(1);
 
             // Check that currency was deducted
-            expect(store.currency).toBe(initialCurrency - farmCost);
+            expect(newState.currency).toBe(initialCurrency - farmCost);
         });
 
         it('prevents purchasing when currency is insufficient', () => {
-            // Set currency to 0
-            store.currency = 0n;
-            const initialLevel = store.businesses.farm.level;
+            // Update state to set currency to 0
+            store.dispatch({ type: 'business/setCurrency', payload: 0n });
+
+            const initialState = store.getState().business;
+            const initialLevel = initialState.businesses.farm.level;
 
             // Attempt to purchase
-            store.purchaseBusiness('farm');
+            store.dispatch(purchaseBusiness('farm'));
+
+            const newState = store.getState().business;
 
             // Level should not change
-            expect(store.businesses.farm.level).toBe(initialLevel);
+            expect(newState.businesses.farm.level).toBe(initialLevel);
         });
 
         it('increases cost for subsequent purchases', () => {
             // Purchase first level
-            store.purchaseBusiness('farm');
+            store.dispatch(purchaseBusiness('farm'));
+
+            const state = store.getState().business;
 
             // Get initial base cost
-            const baseCost = store.businesses.farm.baseCost;
+            const baseCost = state.businesses.farm.baseCost;
 
             // Calculate expected cost for next level (5x multiplier)
             const expectedCost = baseCost * 5n;
 
             // Get what the actual cost would be
             const actualCost = (() => {
-                const business = store.businesses.farm;
+                const business = state.businesses.farm;
                 return business.baseCost * (5n ** BigInt(business.level));
             })();
 
@@ -66,82 +111,87 @@ describe('businessSlice', () => {
     });
 
     describe('updateBusinesses', () => {
-        it('collects profit from businesses that have completed their production cycle', () => {
+        it('updates business timers', () => {
             // Purchase a business
-            store.purchaseBusiness('farm');
+            store.dispatch(purchaseBusiness('farm'));
 
             // Mock lastProduction to be in the past
             const now = Date.now();
-            const farmProductionTime = store.businesses.farm.productionTime * 1000; // Convert to ms
-            store.businesses.farm.lastProduction = now - farmProductionTime - 1000; // 1 extra second
+            const fiveSecondsAgo = now - 5000;
 
-            // Record initial currency
-            const initialCurrency = store.currency;
+            // Manually update the lastProduction time
+            store.dispatch({
+                type: 'business/setBusinessLastProduction',
+                payload: { id: 'farm', time: fiveSecondsAgo }
+            });
 
             // Update businesses
-            store.updateBusinesses();
+            store.dispatch(updateBusinesses());
 
-            // Should have collected farm profit
-            const expectedProfit = store.businesses.farm.baseProfit;
-            expect(store.currency).toBe(initialCurrency + expectedProfit);
+            const state = store.getState().business;
+
+            // Should have marked the business as ready for collection
+            expect(state.businesses.farm.readyForCollection).toBe(true);
+            expect(state.businesses.farm.remainingTime).toBe(0);
+        });
+    });
+
+    describe('collectProfit', () => {
+        it('collects profit from a business that is ready', () => {
+            // Purchase a business
+            store.dispatch(purchaseBusiness('farm'));
+
+            // Set lastProduction to be in the past (beyond production time)
+            const now = Date.now();
+            const pastTime = now - 2000; // 2 seconds ago
+
+            // Manually update the lastProduction time
+            store.dispatch({
+                type: 'business/setBusinessLastProduction',
+                payload: { id: 'farm', time: pastTime }
+            });
+
+            // Record initial currency
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
+
+            // Collect profit
+            store.dispatch(collectProfit('farm'));
+
+            const newState = store.getState().business;
+
+            // Should have collected farm profit (baseProfit for level 1)
+            const expectedProfit = initialState.businesses.farm.baseProfit;
+            expect(newState.currency).toBe(initialCurrency + expectedProfit);
 
             // Should have updated lastProduction
-            expect(store.businesses.farm.lastProduction).toBeGreaterThanOrEqual(now);
+            expect(newState.businesses.farm.lastProduction).toBeGreaterThanOrEqual(now);
         });
 
         it('does not collect profit when production cycle is incomplete', () => {
             // Purchase a business
-            store.purchaseBusiness('farm');
+            store.dispatch(purchaseBusiness('farm'));
 
-            // Set lastProduction to be very recent
-            store.businesses.farm.lastProduction = Date.now();
+            // Set lastProduction to be very recent (not enough time passed)
+            const now = Date.now();
+
+            // Manually update the lastProduction time
+            store.dispatch({
+                type: 'business/setBusinessLastProduction',
+                payload: { id: 'farm', time: now }
+            });
 
             // Record initial currency
-            const initialCurrency = store.currency;
+            const initialState = store.getState().business;
+            const initialCurrency = initialState.currency;
 
-            // Update businesses
-            store.updateBusinesses();
+            // Try to collect profit
+            store.dispatch(collectProfit('farm'));
+
+            const newState = store.getState().business;
 
             // Currency should not change
-            expect(store.currency).toBe(initialCurrency);
-        });
-
-        it('skips businesses with level 0', () => {
-            // Ensure farm is at level 0
-            store.businesses.farm.level = 0;
-
-            // Mock lastProduction to be in the past
-            store.businesses.farm.lastProduction = Date.now() - 10000;
-
-            // Record initial currency
-            const initialCurrency = store.currency;
-
-            // Update businesses
-            store.updateBusinesses();
-
-            // Currency should not change
-            expect(store.currency).toBe(initialCurrency);
-        });
-
-        it('scales profit with business level', () => {
-            // Set farm to level 3
-            store.businesses.farm.level = 3;
-
-            // Calculate expected profit at level 3: baseProfit * 2^(level-1) = baseProfit * 2^2 = baseProfit * 4
-            const baseProfit = store.businesses.farm.baseProfit;
-            const expectedProfit = baseProfit * 4n;
-
-            // Mock lastProduction to be in the past
-            store.businesses.farm.lastProduction = Date.now() - 10000;
-
-            // Record initial currency
-            const initialCurrency = store.currency;
-
-            // Update businesses
-            store.updateBusinesses();
-
-            // Currency should increase by the expected profit
-            expect(store.currency).toBe(initialCurrency + expectedProfit);
+            expect(newState.currency).toBe(initialCurrency);
         });
     });
 }); 

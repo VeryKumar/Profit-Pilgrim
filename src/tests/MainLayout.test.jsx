@@ -3,6 +3,7 @@ import { screen, fireEvent, render } from '@testing-library/react';
 import { renderWithProviders } from './utils';
 import MainLayout from '../components/MainLayout';
 import * as storeModule from '../stores/store';
+import * as StageContextModule from '../contexts/StageContext';
 
 // Mock the necessary modules
 vi.mock('../stores/store', () => {
@@ -12,17 +13,8 @@ vi.mock('../stores/store', () => {
 });
 
 vi.mock('../contexts/StageContext', () => ({
-    useStage: () => ({
-        currentStage: 'beginning',
-        stageName: 'The Journey Begins',
-        stageDescription: 'Your first steps on the path to profit',
-        theme: {
-            primary: '#6366f1',
-            secondary: '#4f46e5',
-            background: '#f8fafc',
-            accent: '#ec4899',
-        }
-    })
+    StageProvider: ({ children }) => children,
+    useStage: vi.fn()
 }));
 
 // Mock formatCurrency to avoid BigInt issues in tests
@@ -34,6 +26,7 @@ describe('MainLayout', () => {
     const mockPurchaseBusiness = vi.fn();
     const mockTogglePowerUpModal = vi.fn();
     const mockAddClick = vi.fn();
+    const mockCheckStageProgress = vi.fn();
 
     beforeEach(() => {
         // Reset mocks
@@ -75,6 +68,20 @@ describe('MainLayout', () => {
                 purchaseBusiness: mockPurchaseBusiness
             };
             return selector(store);
+        });
+
+        // Mock the StageContext
+        StageContextModule.useStage.mockReturnValue({
+            currentStage: 'beginning',
+            stageName: 'The Journey Begins',
+            stageDescription: 'Your first steps on the path to profit',
+            theme: {
+                primary: '#6366f1',
+                secondary: '#4f46e5',
+                background: '#f8fafc',
+                accent: '#ec4899',
+            },
+            checkStageProgress: mockCheckStageProgress
         });
     });
 
@@ -182,5 +189,26 @@ describe('MainLayout', () => {
 
         // Check that addClick was called
         expect(mockAddClick).toHaveBeenCalled();
+    });
+
+    it('applies the current theme from StageContext', () => {
+        // Set a specific theme for testing
+        StageContextModule.useStage.mockReturnValue({
+            currentStage: 'momentum',
+            stageName: 'Building Momentum',
+            stageDescription: 'Your business is growing steadily',
+            theme: {
+                primary: '#14b8a6',
+                secondary: '#0d9488',
+                background: '#f8fafc',
+                accent: '#f97316',
+            },
+            checkStageProgress: mockCheckStageProgress
+        });
+
+        render(<MainLayout />);
+
+        // Check that the stage name is displayed
+        expect(screen.getByText('Building Momentum')).toBeInTheDocument();
     });
 }); 

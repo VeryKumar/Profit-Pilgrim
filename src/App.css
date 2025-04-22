@@ -262,6 +262,45 @@ body {
   justify-content: center;
   background-color: rgba(255, 255, 255, 0.2);
   border-radius: 10px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.business-icon.clickable {
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.business-icon.clickable:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.business-icon.clickable:active {
+  transform: scale(0.95);
+}
+
+.business-icon.clickable::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: rgba(255, 255, 255, 0.1);
+  transform: rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.business-icon.clickable:hover::after {
+  opacity: 1;
+  animation: shine 2s infinite linear;
+}
+
+.business-icon.icon-ready {
+  animation: pulse-icon 1.5s infinite;
+  box-shadow: 0 0 15px var(--color-accent);
 }
 
 .business-info {
@@ -304,21 +343,38 @@ body {
   overflow: hidden;
 }
 
-.buy-button:hover:not(:disabled) {
+.upgrade-button {
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  padding: 5px 15px;
+  border-radius: 15px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.1s, background-color 0.2s;
+  position: relative;
+  overflow: hidden;
+}
+
+.buy-button:hover:not(:disabled),
+.upgrade-button:hover:not(:disabled) {
   transform: scale(1.05);
 }
 
-.buy-button:active:not(:disabled) {
+.buy-button:active:not(:disabled),
+.upgrade-button:active:not(:disabled) {
   transform: scale(0.95);
 }
 
-.buy-button.disabled {
+.buy-button.disabled,
+.upgrade-button.disabled {
   background-color: #ccc;
   color: #666;
   cursor: not-allowed;
 }
 
-.buy-button:not(.disabled)::after {
+.buy-button:not(.disabled)::after,
+.upgrade-button:not(.disabled)::after {
   content: '';
   position: absolute;
   top: -50%;
@@ -337,6 +393,13 @@ body {
   100% {
     transform: translateX(100%) rotate(45deg);
   }
+}
+
+/* Business feedback when collecting profit */
+.business-feedback {
+  font-size: 1.4em;
+  font-weight: bold;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
 }
 
 /* Footer */

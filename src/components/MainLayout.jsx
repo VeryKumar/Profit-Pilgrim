@@ -9,6 +9,8 @@ function MainLayout() {
     const currency = useStore(state => state.currency);
     const businesses = useStore(state => state.businesses || {});
     const purchaseBusiness = useStore(state => state.purchaseBusiness);
+    const upgradeBusinessLevel = useStore(state => state.upgradeBusinessLevel);
+    const collectProfit = useStore(state => state.collectProfit);
     const addClick = useStore(state => state.addClick);
     const clickValue = useStore(state => state.clickValue);
     const idleRate = useStore(state => state.idleRate);
@@ -16,6 +18,7 @@ function MainLayout() {
     const [clickFeedback, setClickFeedback] = useState(null);
     const [businessTimers, setBusinessTimers] = useState({});
     const [showClickPrompt, setShowClickPrompt] = useState(true);
+    const [businessFeedback, setBusinessFeedback] = useState(null);
     const { theme } = useStage();
 
     // Hide the click prompt after first interaction or after 5 seconds
@@ -82,6 +85,15 @@ function MainLayout() {
         return baseCost * (5n ** BigInt(business.level));
     };
 
+    // Helper function to calculate upgrade cost
+    const calculateUpgradeCost = (business) => {
+        if (business.level === 0) return 0n;
+        const baseCost = typeof business.baseCost === 'bigint'
+            ? business.baseCost
+            : BigInt(business.baseCost);
+        return baseCost * (10n ** BigInt(business.level));
+    };
+
     // Helper function to calculate business profit
     const calculateProfit = (business) => {
         if (business.level === 0) return 0n;
@@ -93,6 +105,14 @@ function MainLayout() {
 
     const canAffordBusiness = (business) => {
         const cost = calculateCost(business);
+        return typeof currency === 'bigint'
+            ? currency >= cost
+            : BigInt(currency.toString()) >= cost;
+    };
+
+    const canAffordUpgrade = (business) => {
+        if (business.level === 0) return false;
+        const cost = calculateUpgradeCost(business);
         return typeof currency === 'bigint'
             ? currency >= cost
             : BigInt(currency.toString()) >= cost;
@@ -119,6 +139,40 @@ function MainLayout() {
         setTimeout(() => {
             setClickFeedback(null);
         }, 1000);
+    };
+
+    // Handle business clicks
+    const handleBusinessClick = (e, business) => {
+        e.stopPropagation(); // Prevent the click area from also triggering
+
+        if (business.level === 0) return; // Cannot click on locked businesses
+
+        const wasCollected = collectProfit(business.id);
+
+        if (wasCollected) {
+            // Create visual feedback for profit collection
+            const rect = e.currentTarget.getBoundingClientRect();
+            const clickPos = {
+                x: rect.left + rect.width / 2,
+                y: rect.top + rect.height / 2
+            };
+
+            const profit = calculateProfit(business);
+
+            setBusinessFeedback({
+                id: Date.now(),
+                pos: clickPos,
+                businessId: business.id,
+                value: `+${formatCurrency(profit)}`
+            });
+
+            // Remove feedback after animation
+            setTimeout(() => {
+                setBusinessFeedback(feedbackState =>
+                    feedbackState && feedbackState.businessId === business.id ? null : feedbackState
+                );
+            }, 1000);
+        }
     };
 
     return (
@@ -204,6 +258,20 @@ function MainLayout() {
                         {clickFeedback.value}
                     </div>
                 )}
+
+                {businessFeedback && (
+                    <div
+                        className="click-feedback business-feedback"
+                        style={{
+                            position: 'absolute',
+                            left: `${businessFeedback.pos.x}px`,
+                            top: `${businessFeedback.pos.y}px`,
+                            color: theme.accent
+                        }}
+                    >
+                        {businessFeedback.value}
+                    </div>
+                )}
             </div>
 
             {/* Gift notification */}
@@ -227,10 +295,15 @@ function MainLayout() {
                         <div className={`business-item ${isReady ? 'business-ready' : ''}`} key={business.id}>
                             <div className="business-header">
                                 <div className="business-amount">{formatCurrency(calculateProfit(business))}</div>
-                                <div>{business.level > 0 ? 'profit per cycle' : 'locked'}</div>
+                                <div>{business.level > 0 ? 'profit per click' : 'locked'}</div>
                             </div>
                             <div className="business-content">
-                                <div className={`business-icon ${isReady ? 'icon-ready' : ''}`}>{business.icon}</div>
+                                <div
+                                    className={`business-icon ${isReady ? 'icon-ready' : ''} ${business.level > 0 ? 'clickable' : ''}`}
+                                    onClick={(e) => handleBusinessClick(e, business)}
+                                >
+                                    {business.icon}
+                                </div>
                                 <div className="business-info">
                                     <div className="business-name">{business.name}</div>
                                     <div className="business-production">Level {business.level}</div>
@@ -245,23 +318,37 @@ function MainLayout() {
                                 </div>
                             </div>
                             <div className="business-footer">
-                                <div className="business-cost">
-                                    <span>{formatCurrency(calculateCost(business))}</span>
-                                </div>
-                                <div className={`business-timer ${isReady ? 'timer-ready' : ''}`}>
-                                    {business.level > 0
-                                        ? isReady
-                                            ? 'Ready!'
-                                            : `${timer.timeLeft}s`
-                                        : '00:00:00'}
-                                </div>
-                                <button
-                                    className={`buy-button ${canAffordBusiness(business) ? '' : 'disabled'}`}
-                                    onClick={() => purchaseBusiness(business.id)}
-                                    disabled={!canAffordBusiness(business)}
-                                >
-                                    Buy x1
-                                </button>
+                                {business.level === 0 ? (
+                                    <>
+                                        <div className="business-cost">
+                                            <span>{formatCurrency(calculateCost(business))}</span>
+                                        </div>
+                                        <div className="business-timer">00:00:00</div>
+                                        <button
+                                            className={`buy-button ${canAffordBusiness(business) ? '' : 'disabled'}`}
+                                            onClick={() => purchaseBusiness(business.id)}
+                                            disabled={!canAffordBusiness(business)}
+                                        >
+                                            Buy x1
+                                        </button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="business-cost">
+                                            <span>{formatCurrency(calculateUpgradeCost(business))}</span>
+                                        </div>
+                                        <div className={`business-timer ${isReady ? 'timer-ready' : ''}`}>
+                                            {isReady ? 'Ready!' : `${timer.timeLeft}s`}
+                                        </div>
+                                        <button
+                                            className={`upgrade-button ${canAffordUpgrade(business) ? '' : 'disabled'}`}
+                                            onClick={() => upgradeBusinessLevel(business.id)}
+                                            disabled={!canAffordUpgrade(business)}
+                                        >
+                                            Upgrade
+                                        </button>
+                                    </>
+                                )}
                             </div>
                         </div>
                     );
