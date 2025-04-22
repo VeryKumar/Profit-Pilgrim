@@ -14,7 +14,18 @@ function MainLayout() {
     const idleRate = useStore(state => state.idleRate);
     const [remainingTime, setRemainingTime] = useState('00:00:00');
     const [clickFeedback, setClickFeedback] = useState(null);
+    const [businessTimers, setBusinessTimers] = useState({});
+    const [showClickPrompt, setShowClickPrompt] = useState(true);
     const { theme } = useStage();
+
+    // Hide the click prompt after first interaction or after 5 seconds
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowClickPrompt(false);
+        }, 5000);
+
+        return () => clearTimeout(timer);
+    }, []);
 
     // Update the timer every second
     useEffect(() => {
@@ -28,6 +39,40 @@ function MainLayout() {
 
         return () => clearInterval(timer);
     }, []);
+
+    // Update business timers
+    useEffect(() => {
+        const interval = setInterval(() => {
+            const now = Date.now();
+            const updatedTimers = {};
+
+            Object.values(businesses).forEach(business => {
+                if (business.level === 0) {
+                    updatedTimers[business.id] = {
+                        progress: 0,
+                        timeLeft: 0,
+                        ready: false
+                    };
+                    return;
+                }
+
+                const timeSinceProduction = (now - business.lastProduction) / 1000;
+                const cycleTime = business.productionTime;
+                const progress = Math.min(timeSinceProduction / cycleTime, 1);
+                const timeLeft = Math.max(0, cycleTime - timeSinceProduction);
+
+                updatedTimers[business.id] = {
+                    progress,
+                    timeLeft: timeLeft.toFixed(1),
+                    ready: progress >= 1
+                };
+            });
+
+            setBusinessTimers(updatedTimers);
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [businesses]);
 
     // Helper function to calculate business cost
     const calculateCost = (business) => {
@@ -56,6 +101,9 @@ function MainLayout() {
     // Handle clicking with visual feedback
     const handleClick = (e) => {
         addClick();
+
+        // Hide the click prompt once the user clicks
+        setShowClickPrompt(false);
 
         // Create visual feedback
         const clickPos = { x: e.clientX, y: e.clientY };
@@ -136,6 +184,13 @@ function MainLayout() {
 
             {/* Click area for earning currency */}
             <div className="click-area" onClick={handleClick}>
+                {showClickPrompt && (
+                    <div className="click-prompt">
+                        <div className="click-icon">👆</div>
+                        <div className="click-text">Click anywhere to earn money!</div>
+                    </div>
+                )}
+
                 {clickFeedback && (
                     <div
                         className="click-feedback"
@@ -143,10 +198,7 @@ function MainLayout() {
                             position: 'absolute',
                             left: `${clickFeedback.pos.x}px`,
                             top: `${clickFeedback.pos.y}px`,
-                            color: theme.accent,
-                            fontWeight: 'bold',
-                            animation: 'float-up 1s ease-out',
-                            pointerEvents: 'none'
+                            color: theme.accent
                         }}
                     >
                         {clickFeedback.value}
@@ -167,44 +219,59 @@ function MainLayout() {
 
             {/* Game content */}
             <div className="game-content">
-                {Object.values(businesses).map(business => (
-                    <div className="business-item" key={business.id}>
-                        <div className="business-header">
-                            <div className="business-amount">{formatCurrency(calculateProfit(business))}</div>
-                            <div>{business.level > 0 ? 'profit per cycle' : 'locked'}</div>
-                        </div>
-                        <div className="business-content">
-                            <div className="business-icon">{business.icon}</div>
-                            <div className="business-info">
-                                <div className="business-name">{business.name}</div>
-                                <div className="business-production">Level {business.level}</div>
+                {Object.values(businesses).map(business => {
+                    const timer = businessTimers[business.id] || { progress: 0, timeLeft: business.productionTime, ready: false };
+                    const isReady = timer.ready && business.level > 0;
+
+                    return (
+                        <div className={`business-item ${isReady ? 'business-ready' : ''}`} key={business.id}>
+                            <div className="business-header">
+                                <div className="business-amount">{formatCurrency(calculateProfit(business))}</div>
+                                <div>{business.level > 0 ? 'profit per cycle' : 'locked'}</div>
+                            </div>
+                            <div className="business-content">
+                                <div className={`business-icon ${isReady ? 'icon-ready' : ''}`}>{business.icon}</div>
+                                <div className="business-info">
+                                    <div className="business-name">{business.name}</div>
+                                    <div className="business-production">Level {business.level}</div>
+                                    {business.level > 0 && (
+                                        <div className="progress-bar-container">
+                                            <div
+                                                className="progress-bar-fill"
+                                                style={{ width: `${timer.progress * 100}%` }}
+                                            ></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="business-footer">
+                                <div className="business-cost">
+                                    <span>{formatCurrency(calculateCost(business))}</span>
+                                </div>
+                                <div className={`business-timer ${isReady ? 'timer-ready' : ''}`}>
+                                    {business.level > 0
+                                        ? isReady
+                                            ? 'Ready!'
+                                            : `${timer.timeLeft}s`
+                                        : '00:00:00'}
+                                </div>
+                                <button
+                                    className={`buy-button ${canAffordBusiness(business) ? '' : 'disabled'}`}
+                                    onClick={() => purchaseBusiness(business.id)}
+                                    disabled={!canAffordBusiness(business)}
+                                >
+                                    Buy x1
+                                </button>
                             </div>
                         </div>
-                        <div className="business-footer">
-                            <div className="business-cost">
-                                <span>{formatCurrency(calculateCost(business))}</span>
-                            </div>
-                            <div className="business-timer">
-                                {business.level > 0
-                                    ? `${business.productionTime}s`
-                                    : '00:00:00'}
-                            </div>
-                            <button
-                                className={`buy-button ${canAffordBusiness(business) ? '' : 'disabled'}`}
-                                onClick={() => purchaseBusiness(business.id)}
-                                disabled={!canAffordBusiness(business)}
-                            >
-                                Buy x1
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
 
             {/* Footer */}
             <div className="game-footer">
                 <div className="footer-actions">
-                    <button className="adventures-button">AdVentures</button>
+                    <button className="adventures-button">Profit Pilgrim</button>
                     <button className="launch-button">Launch!</button>
                 </div>
             </div>

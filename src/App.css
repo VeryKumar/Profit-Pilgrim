@@ -1,8 +1,17 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
+  width: 100%;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
   text-align: center;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
 .logo {
@@ -66,17 +75,12 @@ body {
   overflow: hidden;
   margin: 0;
   padding: 0;
-}
-
-#root {
-  max-width: 100%;
-  height: 100vh;
-  margin: 0;
-  padding: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .game-container {
-  width: 100%;
+  width: 100vw;
   height: 100vh;
   display: grid;
   grid-template-columns: 240px 1fr;
@@ -89,6 +93,8 @@ body {
   background-image: url('/background.svg');
   background-size: cover;
   position: relative;
+  margin: 0;
+  padding: 0;
 }
 
 /* Sidebar */
@@ -203,7 +209,7 @@ body {
   grid-template-columns: repeat(2, 1fr);
   grid-gap: 10px;
   overflow-y: auto;
-  z-index: 2;
+  z-index: 3;
   position: relative;
 }
 
@@ -217,7 +223,7 @@ body {
   min-height: 120px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition: transform 0.2s, box-shadow 0.2s;
-  z-index: 2;
+  z-index: 3;
 }
 
 .business-item:hover {
@@ -429,7 +435,7 @@ body {
   cursor: pointer;
 }
 
-/* Adventures button */
+/* Profit Pilgrim button */
 .adventures-button {
   background-color: #4a9c84;
   color: white;
@@ -524,6 +530,116 @@ body {
   }
 }
 
+.click-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.5em;
+  padding: 20px;
+  border-radius: 20px;
+  background-color: rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  opacity: 0.8;
+  transition: opacity 0.3s;
+  z-index: 1;
+}
+
+.click-icon {
+  font-size: 2em;
+  margin-bottom: 10px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Business timers and progress */
+.progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background-color: var(--color-accent);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.business-ready {
+  box-shadow: 0 0 15px var(--color-accent);
+  animation: pulse-border 2s infinite;
+}
+
+.icon-ready {
+  animation: pulse-icon 1.5s infinite;
+}
+
+.timer-ready {
+  color: var(--color-accent);
+  font-weight: bold;
+  animation: pulse-text 1.5s infinite;
+}
+
+@keyframes pulse-border {
+  0% {
+    box-shadow: 0 0 5px var(--color-accent);
+  }
+  50% {
+    box-shadow: 0 0 15px var(--color-accent);
+  }
+  100% {
+    box-shadow: 0 0 5px var(--color-accent);
+  }
+}
+
+@keyframes pulse-icon {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes pulse-text {
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.7;
+  }
+}
+
+/* Ensure these elements are above the click area */
+.game-header, .game-footer, .game-sidebar, .gift-box, .business-item, .global-timer {
+  position: relative;
+  z-index: 3;
+}
+
+/* Make sure click feedback is visible above everything */
 .click-feedback {
   font-size: 1.2em;
   pointer-events: none;
@@ -531,10 +647,4 @@ body {
   font-weight: bold;
   animation: float-up 0.8s ease-out forwards;
   z-index: 100;
-}
-
-/* Game header and footer should be above the click area */
-.game-header, .game-footer, .game-sidebar, .gift-box {
-  position: relative;
-  z-index: 2;
 }

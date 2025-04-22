@@ -45,6 +45,8 @@ describe('Gameplay Integration', () => {
         // Create a mock store
         mockStore = createMockStore({
             currency: 10n, // Start with some currency
+            clickValue: 5, // Set the click value to match our implementation
+            idleRate: 1, // Set idle rate to match our implementation
         });
 
         // Mock the store
@@ -75,10 +77,10 @@ describe('Gameplay Integration', () => {
         });
 
         // 4. Verify currency increased
-        expect(mockStore.currency).toBe(20n); // 10 initial + 10 clicks
+        expect(mockStore.currency).toBe(60n); // 10 initial + (10 clicks * 5 per click)
 
         // 5. Advance time to earn idle income
-        mockStore.idleRate = 1; // Set idle rate
+        // Idle rate is already set in beforeEach
         const initialTime = Date.now();
 
         // Advance 5 seconds
@@ -90,7 +92,7 @@ describe('Gameplay Integration', () => {
         });
 
         // 6. Verify idle income
-        expect(mockStore.currency).toBe(25n); // 20 from clicks + 5 from idle
+        expect(mockStore.currency).toBe(65n); // 60 from clicks + 5 from idle
 
         // 7. Purchase a business
         act(() => {
@@ -99,7 +101,7 @@ describe('Gameplay Integration', () => {
 
         // 8. Verify business purchase
         expect(mockStore.businesses.farm.level).toBe(1);
-        expect(mockStore.currency).toBe(15n); // 25 - 10 cost
+        expect(mockStore.currency).toBe(55n); // 65 - 10 cost
 
         // 9. Wait for business production
         const farmProductionTime = mockStore.businesses.farm.productionTime * 1000;
@@ -110,7 +112,7 @@ describe('Gameplay Integration', () => {
         });
 
         // 10. Verify business income (adjusted based on actual implementation)
-        expect(mockStore.currency).toBe(17n); // Previous value (15) + 2 from farm production (may vary depending on implementation)
+        expect(mockStore.currency).toBe(57n); // Previous value (55) + 2 from farm production (may vary depending on implementation)
 
         // 11. Earn enough for stage progression
         act(() => {

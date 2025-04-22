@@ -17,6 +17,7 @@
  * @property {(id: string) => void} purchaseBusiness
  * @property {(id: string) => void} collectProfit
  * @property {() => void} updateBusinesses
+ * @property {(id: string) => void} upgradeBusinessLevel
  */
 
 export const createBusinessSlice = (set, get) => ({
@@ -121,14 +122,46 @@ export const createBusinessSlice = (set, get) => ({
         }
     },
 
-    collectProfit: (id) => {
+    upgradeBusinessLevel: (id) => {
         const business = get().businesses[id];
         if (!business || business.level === 0) return;
+
+        // Make sure business.baseCost is a BigInt
+        const baseCost = typeof business.baseCost === 'bigint'
+            ? business.baseCost
+            : BigInt(business.baseCost);
+
+        // Upgrade cost is higher than initial purchase - 10x base cost per level
+        const upgradeCost = baseCost * (10n ** BigInt(business.level));
+        const currency = get().currency;
+
+        // Ensure currency is a BigInt
+        const currencyBigInt = typeof currency === 'bigint'
+            ? currency
+            : BigInt(currency.toString());
+
+        if (currencyBigInt >= upgradeCost) {
+            set((state) => ({
+                currency: currencyBigInt - upgradeCost,
+                businesses: {
+                    ...state.businesses,
+                    [id]: {
+                        ...state.businesses[id],
+                        level: state.businesses[id].level + 1,
+                    }
+                }
+            }));
+        }
+    },
+
+    collectProfit: (id) => {
+        const business = get().businesses[id];
+        if (!business || business.level === 0) return false;
 
         const now = Date.now();
         const timePassed = (now - business.lastProduction) / 1000; // in seconds
 
-        if (timePassed < business.productionTime) return; // Not ready yet
+        if (timePassed < business.productionTime) return false; // Not ready yet
 
         // Calculate profit based on level
         // Ensure baseProfit is a BigInt
@@ -154,44 +187,13 @@ export const createBusinessSlice = (set, get) => ({
                 }
             }
         }));
+
+        return true; // Collection was successful
     },
 
     updateBusinesses: () => {
-        const now = Date.now();
-        const { businesses } = get();
-
-        Object.keys(businesses).forEach(id => {
-            const business = businesses[id];
-            if (business.level === 0) return; // Skip unowned businesses
-
-            const timePassed = (now - business.lastProduction) / 1000; // in seconds
-
-            if (timePassed >= business.productionTime) {
-                // Auto-collect if time has passed
-                // Ensure baseProfit is a BigInt
-                const baseProfit = typeof business.baseProfit === 'bigint'
-                    ? business.baseProfit
-                    : BigInt(business.baseProfit);
-
-                const profit = baseProfit * (2n ** BigInt(business.level - 1));
-
-                // Ensure currency is a BigInt
-                const currency = get().currency;
-                const currencyBigInt = typeof currency === 'bigint'
-                    ? currency
-                    : BigInt(currency.toString());
-
-                set((state) => ({
-                    currency: currencyBigInt + profit,
-                    businesses: {
-                        ...state.businesses,
-                        [id]: {
-                            ...state.businesses[id],
-                            lastProduction: now,
-                        }
-                    }
-                }));
-            }
-        });
+        // This function now only triggers UI updates for timers
+        // No actual business production collection happens automatically
+        set((state) => ({ ...state }));
     }
 }); 

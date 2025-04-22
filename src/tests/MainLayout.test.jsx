@@ -99,7 +99,7 @@ describe('MainLayout', () => {
         expect(screen.getByText('Daily Gift')).toBeInTheDocument();
 
         // Check footer
-        expect(screen.getByText('AdVentures')).toBeInTheDocument();
+        expect(screen.getByText('Profit Pilgrim')).toBeInTheDocument();
         expect(screen.getByText('Launch!')).toBeInTheDocument();
     });
 
